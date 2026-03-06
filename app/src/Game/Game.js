@@ -59,6 +59,9 @@ class Game
     // Vies du joueur
     lives = 3;
 
+    // Niveau actuel
+    currentLevel = 0;
+
     // Probabilité de faire tomber un power-up
     probability = 3;
 
@@ -85,6 +88,8 @@ class Game
     elScore;
     // Élément d'affichage des vies
     elLives;
+    // Élément d'affichage du niveau
+    elLevel;
 
     // Images
     images = {
@@ -134,9 +139,53 @@ class Game
         this.initImages();
         // Initialisation des objets du jeu
         this.initGameObjects();
-        // Lancement de la boucle
-        requestAnimationFrame( this.loop.bind(this) );
-        // Après la boucle
+
+        // Création du menu d'accueil
+        this.StartMenu();
+    }
+
+    StartMenu() {
+        this.menuDiv = document.createElement('div');
+        this.menuDiv.className = 'start-menu';
+
+        const title = document.createElement('h1');
+        title.textContent = 'Arkanoïd';
+
+        const startButton = document.createElement('button');
+        startButton.className = 'start-btn';
+        startButton.textContent = 'JOUER';
+
+        startButton.addEventListener('click', () => {
+            this.menuDiv.remove();
+            // Lancement de la boucle
+            requestAnimationFrame( this.loop.bind(this) );
+        });
+
+        this.menuDiv.append(title, startButton);
+        document.body.append(this.menuDiv);
+    }
+
+    showEndMenu(text) {
+        const endMenu = document.createElement('div');
+        endMenu.className = 'start-menu';
+
+        const title = document.createElement('h1');
+        title.textContent = text;
+
+        const scoreDisplay = document.createElement('h2');
+        scoreDisplay.textContent = 'Score final : ' + this.score;
+        scoreDisplay.className = 'end-score';
+
+        const restartButton = document.createElement('button');
+        restartButton.className = 'start-btn';
+        restartButton.textContent = 'REJOUER';
+
+        restartButton.addEventListener('click', () => {
+            location.reload(); // Recharge la page pour relancer le jeu
+        });
+
+        endMenu.append(title, scoreDisplay, restartButton);
+        document.body.append(endMenu);
     }
 
     // Méthodes "privées"
@@ -150,6 +199,9 @@ class Game
         this.elLives = document.createElement('h2');
         this.elLives.textContent = 'Vies : ' + this.lives;
 
+        this.elLevel = document.createElement('h2');
+        this.elLevel.textContent = 'Niveau : ' + (this.currentLevel + 1);
+
         const elCanvas = document.createElement( 'canvas' );
         elCanvas.width = this.config.canvasSize.width;
         elCanvas.height = this.config.canvasSize.height;
@@ -157,7 +209,7 @@ class Game
         // Débug box
         this.debugSpan = document.createElement( 'span' );
         
-        document.body.append( elH1, this.elScore, this.elLives, elCanvas, this.debugSpan );
+        document.body.append( elH1, this.elScore, this.elLives, this.elLevel, elCanvas, this.debugSpan );
 
         // Récupération du contexte de dessin
         this.ctx = elCanvas.getContext('2d');
@@ -303,7 +355,7 @@ class Game
         this.state.paddle = paddle;
 
         // Chargement de briques
-        this.loadBricks(this.levels.data[0]);
+        this.loadBricks(this.levels.data[this.currentLevel]);
     }
 
     // Création des briques
@@ -567,7 +619,7 @@ class Game
         const roll = Math.random();
         if (roll < 1/this.probability) {
             // Liste des types de pouvoir correspondant aux clés dans this.images
-            const powerUpTypes = ['stickyBall'];
+            const powerUpTypes = ['multiBall'];
             
             // Sélection d'un type aléatoire
             const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
@@ -596,20 +648,26 @@ class Game
                     const ballDiameter = this.config.ball.radius * 2;
                     
                     // Création de la 1ere balle
+                    let angle1 = (originalBall.orientation + 30) % 360;
+                    if (angle1 === 0 || angle1 === 180) angle1 += 15;
+
                     const ball1 = new Ball(
                         this.images.ball,
                         ballDiameter, ballDiameter,
-                        (originalBall.orientation + 30) % 360,
+                        angle1,
                         originalBall.speed || this.config.ball.speed
                     );
                     ball1.setPosition(originalBall.position.x, originalBall.position.y);
                     ball1.isCircular = true;
                     
                     // Puis de la seconde
+                    let angle2 = (originalBall.orientation - 30 + 360) % 360;
+                    if (angle2 === 0 || angle2 === 180) angle2 -= 15;
+
                     const ball2 = new Ball(
                         this.images.ball,
                         ballDiameter, ballDiameter,
-                        (originalBall.orientation - 30 + 360) % 360,
+                        angle2,
                         originalBall.speed || this.config.ball.speed
                     );
                     ball2.setPosition(originalBall.position.x, originalBall.position.y);
@@ -794,7 +852,32 @@ class Game
                 this.resetBall();
             } else {
                 // On sort de loop()
+                console.log("Game Over!");
+                this.showEndMenu('Perdu !');
                 return;
+            }
+        }
+
+        // Vérification de la victoire (plus aucune brique destructible)
+        const hasBreakableBricks = this.state.bricks.some( brick => brick.strength > 0 );
+        if( !hasBreakableBricks ) {
+            this.currentLevel++;
+            if (this.currentLevel < this.levels.data.length) {
+                if (this.elLevel) {
+                    this.elLevel.textContent = 'Niveau : ' + (this.currentLevel + 1);
+                }
+                // Chargement du niveau suivant
+                this.loadBricks(this.levels.data[this.currentLevel]);
+                
+                // On vide la zone de jeu des anciens pouvoirs, lasers, et on remet une balle
+                this.state.powerups = [];
+                this.state.lasers = [];
+                this.state.balls = [];
+                this.resetBall();
+            } else {
+                console.log("Félicitations, vous avez terminé tous les niveaux !");
+                this.showEndMenu('Victoire !');
+                return; // Fin du jeu
             }
         }
 
