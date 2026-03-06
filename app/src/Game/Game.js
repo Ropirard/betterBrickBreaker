@@ -53,11 +53,15 @@ class Game
     // Données des niveaux
     levels;
 
-    // Score du joueur
-    score = 0;
+    // Nombre de joueurs
+    numPlayers = 1;
+    activePlayer = 0;
 
-    // Vies du joueur
-    lives = 3;
+    // Statistiques des joueurs
+    playerStats = [
+        { score: 0, lives: 3 },
+        { score: 0, lives: 3 }
+    ];
 
     // Niveau actuel
     currentLevel = 0;
@@ -84,6 +88,8 @@ class Game
     // <span> de débug
     debugSpan;
     debugInfo = '';
+    // Élément d'affichage du joueur
+    elCurrentPlayer;
     // Élément d'affichage du score
     elScore;
     // Élément d'affichage des vies
@@ -151,18 +157,38 @@ class Game
         const title = document.createElement('h1');
         title.textContent = 'Arkanoïd';
 
-        const startButton = document.createElement('button');
-        startButton.className = 'start-btn';
-        startButton.textContent = 'JOUER';
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex';
+        btnContainer.style.gap = '20px';
 
-        startButton.addEventListener('click', () => {
-            this.menuDiv.remove();
-            // Lancement de la boucle
-            requestAnimationFrame( this.loop.bind(this) );
+        const btn1P = document.createElement('button');
+        btn1P.className = 'start-btn';
+        btn1P.textContent = '1 JOUEUR';
+
+        const btn2P = document.createElement('button');
+        btn2P.className = 'start-btn';
+        btn2P.textContent = '2 JOUEURS';
+
+        btn1P.addEventListener('click', () => {
+            this.numPlayers = 1;
+            this.startGame();
         });
 
-        this.menuDiv.append(title, startButton);
+        btn2P.addEventListener('click', () => {
+            this.numPlayers = 2;
+            this.startGame();
+        });
+
+        btnContainer.append(btn1P, btn2P);
+        this.menuDiv.append(title, btnContainer);
         document.body.append(this.menuDiv);
+    }
+
+    startGame() {
+        this.menuDiv.remove();
+        this.updateUI();
+        // Lancement de la boucle
+        requestAnimationFrame( this.loop.bind(this) );
     }
 
     showEndMenu(text) {
@@ -173,8 +199,13 @@ class Game
         title.textContent = text;
 
         const scoreDisplay = document.createElement('h2');
-        scoreDisplay.textContent = 'Score final : ' + this.score;
+        if (this.numPlayers === 1) {
+            scoreDisplay.textContent = 'Score final : ' + this.playerStats[0].score;
+        } else {
+            scoreDisplay.innerHTML = `Score J1 : ${this.playerStats[0].score}<br>Score J2 : ${this.playerStats[1].score}`;
+        }
         scoreDisplay.className = 'end-score';
+        scoreDisplay.style.textAlign = 'center';
 
         const restartButton = document.createElement('button');
         restartButton.className = 'start-btn';
@@ -193,14 +224,12 @@ class Game
         const elH1 = document.createElement('h1');
         elH1.textContent = 'Arkanoïd';
 
+        this.elCurrentPlayer = document.createElement('h2');
+        this.elCurrentPlayer.style.color = '#e74c3c';
+        
         this.elScore = document.createElement('h2');
-        this.elScore.textContent = 'Score : ' + this.score;
-
         this.elLives = document.createElement('h2');
-        this.elLives.textContent = 'Vies : ' + this.lives;
-
         this.elLevel = document.createElement('h2');
-        this.elLevel.textContent = 'Niveau : ' + (this.currentLevel + 1);
 
         const elCanvas = document.createElement( 'canvas' );
         elCanvas.width = this.config.canvasSize.width;
@@ -209,7 +238,7 @@ class Game
         // Débug box
         this.debugSpan = document.createElement( 'span' );
         
-        document.body.append( elH1, this.elScore, this.elLives, this.elLevel, elCanvas, this.debugSpan );
+        document.body.append( elH1, this.elCurrentPlayer, this.elScore, this.elLives, this.elLevel, elCanvas, this.debugSpan );
 
         // Récupération du contexte de dessin
         this.ctx = elCanvas.getContext('2d');
@@ -217,6 +246,19 @@ class Game
         // Écouteur d'évènements du clavier
         document.addEventListener( 'keydown', this.handlerKeyboard.bind(this, true) );
         document.addEventListener( 'keyup', this.handlerKeyboard.bind(this, false) );
+    }
+
+    updateUI() {
+        if (this.numPlayers === 1) {
+            this.elCurrentPlayer.textContent = '';
+            this.elScore.textContent = 'Score : ' + this.playerStats[0].score;
+            this.elLives.textContent = 'Vies : ' + this.playerStats[0].lives;
+        } else {
+            this.elCurrentPlayer.textContent = 'AU TOUR DU JOUEUR ' + (this.activePlayer + 1);
+            this.elScore.textContent = 'Score : '  + this.playerStats[this.activePlayer].score;
+            this.elLives.textContent = 'Vies : ' + this.playerStats[this.activePlayer].lives;
+        }
+        this.elLevel.textContent = 'Niveau : ' + (this.currentLevel + 1);
     }
 
     // Création des images
@@ -500,10 +542,8 @@ class Game
                 theBrick.strength--;
                 // Ajout du score si la brique atteint 0 (se casse)
                 if (theBrick.strength === 0) {
-                    this.score += 100;
-                    if (this.elScore) {
-                        this.elScore.textContent = 'Score : ' + this.score;
-                    }
+                    this.playerStats[this.activePlayer].score += 100;
+                    this.updateUI();
                     this.powerUp(theBrick.position.x, theBrick.position.y);
                 }
             });
@@ -569,10 +609,8 @@ class Game
                     // On casse la brique (ou on la blesse)
                     theBrick.strength--;
                     if (theBrick.strength === 0) {
-                        this.score += 100;
-                        if (this.elScore) {
-                            this.elScore.textContent = 'Score : ' + this.score;
-                        }
+                        this.playerStats[this.activePlayer].score += 100;
+                        this.updateUI();
                         this.powerUp(theBrick.position.x, theBrick.position.y);
                     }
                 }
@@ -843,17 +881,27 @@ class Game
 
         // S'il n'y a aucune balle restante, on a perdu une vie
         if( this.state.balls.length <= 0 ) {
-            this.lives--;
-            if (this.elLives) {
-                this.elLives.textContent = 'Vies : ' + this.lives;
-            }
+            this.playerStats[this.activePlayer].lives--;
 
-            if (this.lives > 0) {
+            let nextPlayer = this.activePlayer;
+            // Si on est en 2 joueurs, on change de joueur s'il reste des vies à l'autre joueur
+            if (this.numPlayers === 2) {
+                const otherPlayer = (this.activePlayer + 1) % 2;
+                if (this.playerStats[otherPlayer].lives > 0) {
+                    nextPlayer = otherPlayer;
+                }
+            }
+            
+            this.activePlayer = nextPlayer;
+            this.updateUI();
+
+            // S'il reste des vies au joueur actif, on continue
+            if (this.playerStats[this.activePlayer].lives > 0) {
                 this.resetBall();
             } else {
-                // On sort de loop()
+                // Sinon, Game Over (les deux joueurs sont morts)
                 console.log("Game Over!");
-                this.showEndMenu('Perdu !');
+                this.showEndMenu('Partie terminée');
                 return;
             }
         }
@@ -863,9 +911,7 @@ class Game
         if( !hasBreakableBricks ) {
             this.currentLevel++;
             if (this.currentLevel < this.levels.data.length) {
-                if (this.elLevel) {
-                    this.elLevel.textContent = 'Niveau : ' + (this.currentLevel + 1);
-                }
+                this.updateUI();
                 // Chargement du niveau suivant
                 this.loadBricks(this.levels.data[this.currentLevel]);
                 
