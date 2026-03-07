@@ -661,7 +661,7 @@ class Game
         const roll = Math.random();
         if (roll < 1/this.probability) {
             // Liste des types de pouvoir correspondant aux clés dans this.images
-            const powerUpTypes = ['multiBall'];
+            const powerUpTypes = ['multiBall', 'stickyBall', 'perforingBall', 'largeSmall', 'laser'];
             
             // Sélection d'un type aléatoire
             const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
